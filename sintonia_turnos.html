@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0e0e0e" />
+<title>Sintonía Salon — Turnos</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --gold: #c9a96e;
+    --gold-light: #e8c98a;
+    --gold-dim: #6b5535;
+    --text: #f0ece4;
+    --text-muted: #888880;
+    --text-dim: #555550;
+    --green: #4caf82;
+    --green-bg: #1a2e24;
+    --amber: #d4a017;
+    --amber-bg: #2a2010;
+    --red: #e05555;
+    --red-bg: #2a1515;
+    --info: #5b9bd5;
+    --info-bg: #151f2e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* Header */
+  .app-header {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 16px 20px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .app-header .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+  }
+  .app-header .logo span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--text-muted);
+    display: block;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    transition: color 0.15s;
+  }
+  .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-btn.active { color: var(--gold); }
+
+  /* Pages */
+  .page { display: none; padding: 16px 16px 0; }
+  .page.active { display: block; }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .stat-num { font-size: 22px; font-weight: 600; color: var(--text); line-height: 1; }
+  .stat-num.gold { color: var(--gold); }
+  .stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop-zone:active { background: var(--surface2); border-color: var(--gold-dim); }
+  .drop-zone .dz-icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-zone p { font-size: 14px; color: var(--text-muted); }
+  .drop-zone .dz-hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  #hidden-file { display: none; }
+
+  /* Turno items */
+  .turno-item {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .turno-info { flex: 1; min-width: 0; }
+  .turno-name { font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+  .turno-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; }
+  .turno-hora { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--gold); min-width: 48px; text-align: center; }
+  .turno-actions { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+
+  /* Badges */
+  .badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 99px; display: inline-flex; align-items: center; gap: 3px; }
+  .b-pend { background: var(--amber-bg); color: var(--amber); }
+  .b-sent { background: var(--green-bg); color: var(--green); }
+  .b-auto { background: var(--info-bg); color: var(--info); }
+  .b-soon { background: var(--red-bg); color: var(--red); }
+
+  /* Buttons */
+  .btn {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: background 0.15s;
+    width: 100%;
+  }
+  .btn:active { background: #2e2e2e; }
+  .btn-gold {
+    background: var(--gold-dim);
+    border-color: var(--gold-dim);
+    color: var(--gold-light);
+  }
+  .btn-gold:active { background: #7a6040; }
+  .btn-sm {
+    font-size: 12px;
+    padding: 6px 12px;
+    width: auto;
+  }
+  .btn-wa {
+    background: #1a2e1e;
+    border-color: #2a4a30;
+    color: #4caf82;
+    font-size: 13px;
+    padding: 7px 12px;
+    width: auto;
+  }
+  .btn-icon-del {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+  }
+  .btn-icon-del:active { color: var(--red); }
+
+  /* Form */
+  .form-group { margin-bottom: 12px; }
+  .form-group label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .form-group input, .form-group select {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 12px 14px;
+    outline: none;
+  }
+  .form-group input:focus { border-color: var(--gold-dim); }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Auto bar */
+  .auto-bar {
+    background: var(--info-bg);
+    border: 0.5px solid var(--info);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .auto-bar-off {
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+  .auto-bar p { flex: 1; font-size: 13px; color: var(--text-muted); }
+  .auto-bar p strong { color: var(--text); }
+  .auto-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex-shrink: 0; animation: pulse 1.5s infinite; }
+  .auto-dot.off { background: var(--text-dim); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Preview message */
+  .msg-preview {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    border-left: 2px solid var(--gold-dim);
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; }
+
+  /* Divider */
+  .divider { height: 0.5px; background: var(--border); margin: 12px 0; }
+
+  /* Template download hint */
+  .hint-box {
+    background: var(--amber-bg);
+    border: 0.5px solid var(--gold-dim);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--amber);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* Countdown chip */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 99px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .chip.gold { border-color: var(--gold-dim); color: var(--gold); background: #1e1810; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="logo">
+    SINTONÍA
+    <span>salon · turnos corporativos</span>
+  </div>
+</div>
+
+<!-- PAGE: TURNOS -->
+<div class="page active" id="page-turnos">
+
+  <div id="auto-bar-el" class="auto-bar auto-bar-off" style="margin-top:4px;">
+    <div class="auto-dot off" id="auto-dot"></div>
+    <p id="auto-bar-text">Modo automático <strong>inactivo</strong></p>
+    <button class="btn btn-sm" id="btn-auto-toggle" onclick="toggleAuto()">Activar</button>
+  </div>
+
+  <div id="chip-countdown" class="chip" style="display:none;">
+    ⏱ Próximo aviso en <strong id="chip-min">—</strong> min
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-num gold" id="s-total">0</div><div class="stat-lbl">Total</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-pend">0</div><div class="stat-lbl">Pendientes</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-env">0</div><div class="stat-lbl">Avisados</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-prox">—</div><div class="stat-lbl">Próx (min)</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Cargar planilla Excel</div>
+    <div class="drop-zone" onclick="document.getElementById('hidden-file').click()">
+      <div class="dz-icon">📊</div>
+      <p>Toca para subir tu planilla</p>
+      <div class="dz-hint">Columnas: Nombre · Telefono · Hora</div>
+    </div>
+    <input type="file" id="hidden-file" accept=".xlsx,.xls,.csv" onchange="onFileChange(event)" />
+    <div class="hint-box">💡 ¿No tienes la plantilla? Ve a "Configuración" y descárgala.</div>
+  </div>
+
+  <div id="turnos-section" style="display:none;">
+    <div class="card" style="padding-bottom:8px;">
+      <div class="card-title">Turnos del día</div>
+      <div id="turno-list"></div>
+    </div>
+    <button class="btn btn-gold" onclick="enviarTodos()" style="margin-bottom:12px;">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Enviar aviso a todos los pendientes
+    </button>
+  </div>
+
+</div>
+
+<!-- PAGE: AGREGAR -->
+<div class="page" id="page-agregar">
+  <div class="card">
+    <div class="card-title">Agregar turno manual</div>
+    <div class="form-group">
+      <label>Nombre del trabajador</label>
+      <input id="inp-nombre" type="text" placeholder="María González" />
+    </div>
+    <div class="form-group">
+      <label>WhatsApp (sin + ni espacios)</label>
+      <input id="inp-tel" type="tel" placeholder="56912345678" />
+    </div>
+    <div class="form-group">
+      <label>Hora del turno</label>
+      <input id="inp-hora" type="time" value="10:00" />
+    </div>
+    <button class="btn btn-gold" onclick="agregarManual()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Agregar turno
+    </button>
+  </div>
+</div>
+
+<!-- PAGE: CONFIG -->
+<div class="page" id="page-config">
+  <div class="card">
+    <div class="card-title">Datos de la activación</div>
+    <div class="form-group">
+      <label>Ubicación dentro de la empresa</label>
+      <input id="ubicacion" type="text" placeholder="Ej: Sala de reuniones B, piso 2" oninput="updatePreview()" />
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label>Avisar con (minutos)</label>
+        <input id="antelacion" type="number" min="5" max="120" value="30" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Vista previa del mensaje</div>
+    <div class="msg-preview" id="preview"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Plantilla de ejemplo</div>
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px; line-height:1.6;">Descarga esta plantilla, llénala con los datos de los trabajadores y súbela en la pestaña Turnos.</p>
+    <button class="btn" onclick="descargarPlantilla()">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Descargar plantilla Excel
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Limpiar datos</div>
+    <button class="btn" onclick="limpiarTurnos()" style="border-color:#3a1515; color:var(--red);">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      Borrar todos los turnos
+    </button>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-turnos" onclick="showPage('turnos')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Turnos
+  </button>
+  <button class="nav-btn" id="nav-agregar" onclick="showPage('agregar')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Agregar
+  </button>
+  <button class="nav-btn" id="nav-config" onclick="showPage('config')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Config
+  </button>
+</nav>
+
+<script>
+  let turnos = [];
+  let autoActivo = false;
+  let autoInterval = null;
+
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('nav-' + name).classList.add('active');
+    if (name === 'config') updatePreview();
+  }
+
+  function buildMsg(t) {
+    const ub = document.getElementById('ubicacion').value.trim() || '[Ubicación no configurada]';
+    return '✂️ Hola ' + t.nombre + ', te avisamos que tu turno con Sintonía Salon se acerca.\n\n📍 Encuéntranos en: ' + ub + '\n🕐 Tu hora: ' + t.hora + '\n\n¡Te esperamos! Solo preséntate a tu hora, nosotros nos encargamos del resto.\n\n— Sintonía Salon';
+  }
+
+  function updatePreview() {
+    const ej = turnos[0] || { nombre: 'María González', hora: '10:30' };
+    document.getElementById('preview').textContent = buildMsg(ej);
+  }
+
+  function enviarUno(id) {
+    const t = turnos.find(x => x.id === id);
+    if (!t) return;
+    const url = 'https://wa.me/' + t.tel + '?text=' + encodeURIComponent(buildMsg(t));
+    window.open(url, '_blank');
+    t.enviado = true;
+    renderTurnos();
+  }
+
+  function enviarTodos() {
+    const pend = turnos.filter(t => !t.enviado);
+    if (!pend.length) { alert('No hay turnos pendientes.'); return; }
+    let i = 0;
+    function next() {
+      if (i >= pend.length) { renderTurnos(); return; }
+      const t = pend[i]; t.enviado = true;
+      window.open('https://wa.me/' + t.tel + '?text=' + encodeURIComponent(buildMsg(t)), '_blank');
+      i++; setTimeout(next, 1400);
+    }
+    next();
+    renderTurnos();
+  }
+
+  function toggleAuto() {
+    autoActivo = !autoActivo;
+    const bar = document.getElementById('auto-bar-el');
+    const dot = document.getElementById('auto-dot');
+    const txt = document.getElementById('auto-bar-text');
+    const btn = document.getElementById('btn-auto-toggle');
+    if (autoActivo) {
+      bar.classList.remove('auto-bar-off');
+      dot.classList.remove('off');
+      txt.innerHTML = 'Modo automático <strong>activo</strong>';
+      btn.textContent = 'Pausar';
+      autoInterval = setInterval(checkAuto, 60000);
+      checkAuto();
+    } else {
+      bar.classList.add('auto-bar-off');
+      dot.classList.add('off');
+      txt.innerHTML = 'Modo automático <strong>inactivo</strong>';
+      btn.textContent = 'Activar';
+      clearInterval(autoInterval);
+      document.getElementById('chip-countdown').style.display = 'none';
+    }
+    renderTurnos();
+  }
+
+  function checkAuto() {
+    const now = new Date();
+    const antelacion = parseInt(document.getElementById('antelacion').value) || 30;
+    turnos.forEach(t => {
+      if (t.enviado) return;
+      const parts = t.hora.split(':');
+      const turnoTime = new Date();
+      turnoTime.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      const diffMin = (turnoTime - now) / 60000;
+      if (diffMin <= antelacion && diffMin > -5) {
+        window.open('https://wa.me/' + t.tel + '?text=' + encodeURIComponent(buildMsg(t)), '_blank');
+        t.enviado = true;
+      }
+    });
+    renderTurnos();
+    updateCountdown();
+  }
+
+  function updateCountdown() {
+    const now = new Date();
+    const antelacion = parseInt(document.getElementById('antelacion').value) || 30;
+    const pending = turnos.filter(t => !t.enviado);
+    const chip = document.getElementById('chip-countdown');
+    if (!pending.length) {
+      document.getElementById('s-prox').textContent = '—';
+      chip.style.display = 'none';
+      return;
+    }
+    let minDiff = Infinity;
+    pending.forEach(t => {
+      const parts = t.hora.split(':');
+      const turnoTime = new Date();
+      turnoTime.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      const aviso = new Date(turnoTime.getTime() - antelacion * 60000);
+      const diff = (aviso - now) / 60000;
+      if (diff > 0 && diff < minDiff) minDiff = diff;
+    });
+    if (minDiff === Infinity) {
+      document.getElementById('s-prox').textContent = '—';
+      chip.style.display = 'none';
+    } else {
+      const mins = Math.round(minDiff);
+      document.getElementById('s-prox').textContent = mins;
+      if (autoActivo) {
+        chip.style.display = 'inline-flex';
+        document.getElementById('chip-min').textContent = mins;
+      }
+    }
+  }
+
+  function renderTurnos() {
+    const sorted = [...turnos].sort((a, b) => a.hora.localeCompare(b.hora));
+    const pend = turnos.filter(t => !t.enviado).length;
+    const env = turnos.filter(t => t.enviado).length;
+    document.getElementById('s-total').textContent = turnos.length;
+    document.getElementById('s-pend').textContent = pend;
+    document.getElementById('s-env').textContent = env;
+    updateCountdown();
+
+    const section = document.getElementById('turnos-section');
+    const list = document.getElementById('turno-list');
+
+    if (!turnos.length) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+
+    const now = new Date();
+    const antelacion = parseInt(document.getElementById('antelacion').value) || 30;
+
+    list.innerHTML = sorted.map(t => {
+      const parts = t.hora.split(':');
+      const turnoTime = new Date();
+      turnoTime.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      const diffMin = (turnoTime - now) / 60000;
+      let badge = '';
+      if (t.enviado) badge = '<span class="badge b-sent">✓ Avisado</span>';
+      else if (diffMin <= antelacion && diffMin > 0) badge = '<span class="badge b-soon">¡Pronto!</span>';
+      else if (autoActivo) badge = '<span class="badge b-auto">● Auto</span>';
+      else badge = '<span class="badge b-pend">Pendiente</span>';
+
+      return '<div class="turno-item">' +
+        '<div class="turno-hora">' + t.hora + '</div>' +
+        '<div class="turno-info">' +
+          '<div class="turno-name">' + t.nombre + '</div>' +
+          '<div class="turno-meta"><span>' + t.tel + '</span></div>' +
+        '</div>' +
+        '<div class="turno-actions">' +
+          badge +
+          (!t.enviado ? '<button class="btn btn-wa btn-sm" onclick="enviarUno(' + t.id + ')">WhatsApp</button>' : '') +
+          '<button class="btn-icon-del" onclick="eliminarTurno(' + t.id + ')" aria-label="Eliminar">✕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function eliminarTurno(id) {
+    if (!confirm('¿Eliminar este turno?')) return;
+    turnos = turnos.filter(t => t.id !== id);
+    renderTurnos();
+  }
+
+  function limpiarTurnos() {
+    if (!confirm('¿Borrar todos los turnos? Esta acción no se puede deshacer.')) return;
+    turnos = [];
+    renderTurnos();
+  }
+
+  function agregarManual() {
+    const nombre = document.getElementById('inp-nombre').value.trim();
+    const tel = document.getElementById('inp-tel').value.trim().replace(/\D/g, '');
+    const hora = document.getElementById('inp-hora').value;
+    if (!nombre || !tel || !hora) { alert('Completa todos los campos antes de agregar.'); return; }
+    turnos.push({ id: Date.now(), nombre, tel, hora, enviado: false });
+    document.getElementById('inp-nombre').value = '';
+    document.getElementById('inp-tel').value = '';
+    alert('Turno agregado ✓');
+    showPage('turnos');
+    renderTurnos();
+  }
+
+  function onFileChange(e) {
+    const file = e.target.files[0];
+    if (file) readExcel(file);
+    e.target.value = '';
+  }
+
+  function readExcel(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        let ok = 0;
+        data.forEach(function(row) {
+          const nombre = (row['Nombre'] || row['nombre'] || '').toString().trim();
+          const tel = (row['Telefono'] || row['telefono'] || row['Teléfono'] || '').toString().trim().replace(/\D/g, '');
+          let hora = (row['Hora'] || row['hora'] || '').toString().trim();
+          if (!nombre || !tel || !hora) return;
+          if (!hora.includes(':')) {
+            const h = Math.floor(parseFloat(hora) * 24);
+            const m = Math.round((parseFloat(hora) * 24 - h) * 60);
+            hora = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+          }
+          turnos.push({ id: Date.now() + ok, nombre, tel, hora, enviado: false });
+          ok++;
+        });
+        alert('Se importaron ' + ok + ' turno(s) correctamente ✓');
+        renderTurnos();
+      } catch(err) {
+        alert('Error al leer el archivo. Verifica las columnas: Nombre, Telefono, Hora.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function descargarPlantilla() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Nombre', 'Telefono', 'Hora'],
+      ['María González', '56912345678', '09:00'],
+      ['Carlos Muñoz', '56987654321', '09:30'],
+      ['Ana Torres', '56911223344', '10:00'],
+      ['Pedro Soto', '56922334455', '10:30'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Turnos');
+    XLSX.writeFile(wb, 'plantilla_turnos_sintonia.xlsx');
+  }
+
+  updatePreview();
+  renderTurnos();
+</script>
+</body>
+</html>
